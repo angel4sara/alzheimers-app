@@ -1,0 +1,14 @@
+# Env & caches
+myenv/
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Not needed for deploy (optional)
+Dataset/
+Plots/
+
+# OS cruft
+.DS_Store
+Thumbs.db
