@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Alzheimer’s Detection</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet" />
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <div class="bg" role="img" aria-label="Abstract brain-themed medical background"></div>
+  <main id="main" class="shell" role="main">
+    <section class="card" aria-labelledby="title">
+      <h1 id="title">Alzheimer’s Detection</h1>
+      <p class="muted">Model: <strong>{{ model_type }}</strong></p>
+
+      <form method="POST" action="/predict" enctype="multipart/form-data" class="form" aria-describedby="help">
+        <label for="image" class="label">Upload MRI</label>
+        <input id="image" name="image" type="file" accept="image/*" required class="file" />
+        <button type="submit" class="btn primary">Predict</button>
+      </form>
+
+      {% if result %}
+      <div class="result success" role="status" aria-live="polite">
+        <div class="result-title">Prediction:</div>
+        <div class="result-value">{{ result }}</div>
+        <div class="elapsed">Elapsed: {{ elapsed }} s</div>
+      </div>
+      {% endif %}
+
+      {% if error %}
+      <div class="result error" role="alert">
+        <div class="result-title">Error</div>
+        <div class="result-value">{{ error }}</div>
+      </div>
+      {% endif %}
+
+      <div class="api muted">
+        API: <code>POST /api/predict</code> with form field <code>image</code>.
+      </div>
+    </section>
+  </main>
+</body>
+</html>

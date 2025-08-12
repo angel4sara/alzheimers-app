@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <title>Alzheimer’s Detection - Home</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <link href="{{ url_for('static', filename='styles.css') }}" rel="stylesheet"/>
+  <style>
+
+    .hero-wrap { display: flex; justify-content: center; }
+    .hero-img { display: block; max-width: 180px; height: auto; margin: 0 auto 1.25rem; }
+    .center-text { text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="bg" role="img" aria-label="Abstract background"></div>
+
+  <main class="shell">
+    <section class="card center-text" style="padding: 2rem;">
+      <div class="hero-wrap">
+        <img
+          src="{{ url_for('static', filename='img/brain-outline.jpg') }}"
+          alt="Brain outline"
+          class="hero-img"
+        />
+      </div>
+
+      <h1>Alzheimer’s Detection</h1>
+
+      <p style="margin-bottom: 1.2rem;">
+        Alzheimer's disease is a neurodegenerative disease that develops gradually and
+        progressively worse over time, affecting millions of people. It leads to dementia
+        and eventually causes death as a result of the shutting down of bodily functions.
+      </p>
+
+      <h2>What are we doing here?</h2>
+      <p style="margin-bottom: 1.5rem;">
+        This application uses machine learning (SVM) to analyze brain scan images (MRI).
+        By processing specific image regions and extracting HOG features, our trained model
+        predicts whether the patient shows signs of dementia, mild dementia, or no dementia.
+      </p>
+
+      <a class="btn primary" href="{{ url_for('predict_page') }}">Go to Detection Form</a>
+    </section>
+  </main>
+</body>
+</html>

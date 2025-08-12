@@ -1,0 +1,159 @@
+import io
+import time
+import joblib
+import numpy as np
+import cv2
+from flask import Flask, request, jsonify, render_template_string
+from skimage.feature import hog
+
+# ----------------------
+# Config
+# ----------------------
+MODEL_PATH = "../SavedFiles/model.pkl"   # adjust if needed
+IMAGE_HEIGHT, IMAGE_WIDTH = 150, 150
+ROI_TOP_LEFT = (50, 50)
+ROI_BOTTOM_RIGHT = (100, 100)
+HOG_ARGS = dict(
+    orientations=9,
+    pixels_per_cell=(8, 8),
+    cells_per_block=(2, 2),
+    visualize=False,
+    channel_axis=2,  # skimage >= 0.19
+)
+
+# ----------------------
+# App + Model
+# ----------------------
+app = Flask(__name__)
+
+model = joblib.load(MODEL_PATH)
+model_type = type(model).__name__
+print(f"Loaded Model: {model_type}")
+
+# ----------------------
+# Helpers
+# ----------------------
+def preprocess_image(file_bytes: bytes) -> np.ndarray:
+    """Return 1D feature vector (multi-view: HOG + raw ROI) ready for model.predict."""
+    # Convert bytes -> OpenCV image (BGR)
+    image_array = np.frombuffer(file_bytes, dtype=np.uint8)
+    img = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError("Unable to decode image")
+
+    # Resize
+    resized = cv2.resize(img, (IMAGE_WIDTH, IMAGE_HEIGHT))
+
+    # ROI
+    x1, y1 = ROI_TOP_LEFT
+    x2, y2 = ROI_BOTTOM_RIGHT
+    roi = resized[y1:y2, x1:x2]  # (h, w, 3)
+
+    # HOG on ROI (expects color w/ channel_axis=2)
+    hog_feature = hog(roi, **HOG_ARGS)               # shape: (n_features,)
+    X_hog = hog_feature.reshape(1, -1)               # (1, n_hog)
+
+    # Flatten raw ROI
+    X_roi = roi.reshape(1, -1)                        # (1, w*h*3)
+
+    # Concatenate (multi-view)
+    features = np.hstack((X_hog, X_roi))             # (1, n_hog + w*h*3)
+    return features
+
+def class_label(pred_int: int) -> str:
+    # Mirror your original mapping
+    if pred_int == 0:
+        return "DEMENTED"
+    elif pred_int == 1:
+        return "MILD DEMENTED"
+    else:
+        return "NON DEMENTED"
+
+# ----------------------
+# Routes
+# ----------------------
+INDEX_HTML = """
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8"/>
+    <title>Alzheimer's Detection</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1"/>
+    <style>
+      body { font-family: system-ui, Arial, sans-serif; margin: 2rem; }
+      .card { max-width: 720px; padding: 1.25rem; border: 1px solid #eee; border-radius: 12px; }
+      .row { display: flex; gap: 1rem; align-items: center; }
+      .result { padding: .75rem 1rem; border-radius: 8px; background: #f8f9fa; margin-top: 1rem; }
+      .muted { color: #666; font-size: .9rem; }
+      button { padding: .6rem 1rem; border-radius: 8px; border: 0; cursor: pointer; }
+      .primary { background: #2563eb; color: white; }
+      input[type=file] { padding: .4rem; }
+      code { background: #f6f8fa; padding: .2rem .4rem; border-radius: 6px; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h2>Alzheimer's Detection (Flask)</h2>
+      <p class="muted">Model: {{ model_type }}</p>
+
+      <form method="POST" action="/predict" enctype="multipart/form-data">
+        <div class="row">
+          <input type="file" name="image" accept="image/*" required />
+          <button class="primary" type="submit">Predict</button>
+        </div>
+      </form>
+
+      {% if result %}
+        <div class="result">
+          <div><strong>Prediction:</strong> {{ result }}</div>
+          <div class="muted">Elapsed: {{ elapsed }} s</div>
+        </div>
+      {% endif %}
+
+      <p class="muted">API: <code>POST /api/predict</code> with form field <code>image</code>.</p>
+    </div>
+  </body>
+</html>
+"""
+
+@app.get("/")
+def index():
+    return render_template_string(INDEX_HTML, model_type=model_type)
+
+@app.post("/predict")
+def predict_form():
+    # HTML form handler
+    file = request.files.get("image")
+    if not file:
+        return render_template_string(INDEX_HTML, model_type=model_type, result="No file uploaded", elapsed="—")
+
+    try:
+        start = time.time()
+        feats = preprocess_image(file.read())
+        pred = model.predict(feats)
+        label = class_label(int(pred[0]))
+        elapsed = round(time.time() - start, 4)
+        return render_template_string(INDEX_HTML, model_type=model_type, result=label, elapsed=elapsed)
+    except Exception as e:
+        return render_template_string(INDEX_HTML, model_type=model_type, result=f"Error: {e}", elapsed="—"), 400
+
+@app.post("/api/predict")
+def predict_api():
+    # JSON API endpoint
+    file = request.files.get("image")
+    if not file:
+        return jsonify(error="No file uploaded"), 400
+
+    try:
+        start = time.time()
+        feats = preprocess_image(file.read())
+        pred = model.predict(feats)
+        label = class_label(int(pred[0]))
+        elapsed = round(time.time() - start, 4)
+        return jsonify(prediction=label, elapsed_seconds=elapsed, model=model_type)
+    except Exception as e:
+        return jsonify(error=str(e)), 400
+
+if __name__ == "__main__":
+    # Dev server
+    app.run(debug=True, host="0.0.0.0", port=5000)
